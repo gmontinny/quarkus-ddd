@@ -1,0 +1,11 @@
+location            = "eastus"
+resource_group_name = "olist-rg"
+cluster_name        = "olist-aks"
+kubernetes_version  = "1.29"
+node_vm_size        = "Standard_D2s_v3"
+node_count          = 2
+node_max_count      = 5
+acr_name            = "olistacr"
+db_sku              = "B_Standard_B1ms"
+db_storage_mb       = 32768
+# db_password       = definir via TF_VAR_db_password ou Azure Key Vault

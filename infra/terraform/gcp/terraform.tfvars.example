@@ -1,0 +1,10 @@
+project_id         = "<SEU_GCP_PROJECT_ID>"
+region             = "us-central1"
+zone               = "us-central1-a"
+cluster_name       = "olist-gke"
+kubernetes_version = "STABLE"
+node_machine_type  = "e2-standard-2"
+node_count         = 1
+node_max_count     = 3
+db_tier            = "db-f1-micro"
+# db_password      = definir via TF_VAR_db_password ou Secret Manager

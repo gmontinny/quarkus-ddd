@@ -1,0 +1,45 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: olist
+
+bases:
+  - ../../base
+
+# Substitui a imagem para apontar para o ECR
+images:
+  - name: olist-app:latest
+    newName: <AWS_ACCOUNT_ID>.dkr.ecr.<AWS_REGION>.amazonaws.com/olist-app
+    newTag: latest
+
+patches:
+  # StorageClass EBS para PVCs
+  - patch: |-
+      - op: add
+        path: /spec/storageClassName
+        value: gp3
+    target:
+      kind: PersistentVolumeClaim
+  # Ingress com ALB Controller
+  - patch: |-
+      - op: replace
+        path: /spec/ingressClassName
+        value: alb
+      - op: add
+        path: /metadata/annotations/kubernetes.io~1ingress.class
+        value: alb
+      - op: add
+        path: /metadata/annotations/alb.ingress.kubernetes.io~1scheme
+        value: internet-facing
+      - op: add
+        path: /metadata/annotations/alb.ingress.kubernetes.io~1target-type
+        value: ip
+      - op: replace
+        path: /spec/rules/0/host
+        value: olist-api.aws.example.com
+      - op: replace
+        path: /spec/rules/1/host
+        value: keycloak.aws.example.com
+    target:
+      kind: Ingress
+      name: olist-ingress

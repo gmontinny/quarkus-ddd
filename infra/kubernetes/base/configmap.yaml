@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: olist-config
+  namespace: olist
+data:
+  APP_NAME: quarkus-ddd
+  APP_PORT: "8081"
+  DB_HOST: postgres-service
+  KEYCLOAK_REALM: spring-webflux
+  KEYCLOAK_CLIENT_ID: spring-webflux-client
+  KEYCLOAK_PORT: "8080"
+  LOG_LEVEL: INFO
+  APP_LOG_LEVEL: DEBUG
+  QUARKUS_OIDC_AUTH_SERVER_URL: http://keycloak-service:8080/realms/spring-webflux
+  QUARKUS_OIDC_TOKEN_ISSUER: http://keycloak-service:8080/realms/spring-webflux
+  QUARKUS_REST_CLIENT_KEYCLOAK_TOKEN_CLIENT_URL: http://keycloak-service:8080
+  QUARKUS_REST_CLIENT_KEYCLOAK_ADMIN_CLIENT_URL: http://keycloak-service:8080
+  MP_JWT_VERIFY_PUBLICKEY_LOCATION: http://keycloak-service:8080/realms/spring-webflux/protocol/openid-connect/certs
+  MP_JWT_VERIFY_ISSUER: http://keycloak-service:8080/realms/spring-webflux
+  QUARKUS_VAULT_URL: http://vault-service:8200

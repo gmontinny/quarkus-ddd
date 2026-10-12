@@ -1,0 +1,38 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: olist
+
+bases:
+  - ../../base
+
+images:
+  - name: olist-app:latest
+    newName: <ACR_NAME>.azurecr.io/olist-app
+    newTag: latest
+
+patches:
+  # StorageClass Azure Managed Disk
+  - patch: |-
+      - op: add
+        path: /spec/storageClassName
+        value: managed-premium
+    target:
+      kind: PersistentVolumeClaim
+  # Ingress com Application Gateway Ingress Controller
+  - patch: |-
+      - op: replace
+        path: /spec/ingressClassName
+        value: azure-application-gateway
+      - op: add
+        path: /metadata/annotations/kubernetes.io~1ingress.class
+        value: azure/application-gateway
+      - op: replace
+        path: /spec/rules/0/host
+        value: olist-api.azure.example.com
+      - op: replace
+        path: /spec/rules/1/host
+        value: keycloak.azure.example.com
+    target:
+      kind: Ingress
+      name: olist-ingress

@@ -33,6 +33,8 @@ Os dados utilizados são do dataset público **Olist Brazilian E-Commerce** (Kag
 - [Liquibase — Versionamento do Banco](#liquibase--versionamento-do-banco)
 - [Testes](#testes)
 - [Docker e Docker Compose](#docker-e-docker-compose)
+- [Kubernetes](#kubernetes)
+- [Terraform — AWS / Azure / GCP](#terraform--aws--azure--gcp)
 - [Boas Práticas Aplicadas](#boas-práticas-aplicadas)
 
 ---
@@ -784,6 +786,163 @@ src/test/java/br/com/
 | `quarkus-test-security` | Simula autenticação com `@TestSecurity` |
 | `quarkus-test-vertx` | Contexto Vert.x com `@RunOnVertxContext` |
 | `quarkus-panache-mock` | Mock de repositórios Panache |
+
+---
+
+## Kubernetes
+
+Manifests Kubernetes organizados com **Kustomize** — base agnóstica de cloud + overlays por provider.
+
+```
+infra/kubernetes/
+├── base/                  # Manifests comuns a todas as clouds
+│   ├── namespace.yaml
+│   ├── configmap.yaml
+│   ├── secret.yaml        # Substituir por External Secrets em prod
+│   ├── postgres.yaml      # Deployment + Service + PVC
+│   ├── keycloak.yaml      # Deployment + Service
+│   ├── vault.yaml         # Deployment + Service + Job init
+│   ├── deployment.yaml    # App + HPA
+│   ├── ingress.yaml
+│   └── kustomization.yaml
+└── overlays/
+    ├── aws/               # ECR image + ALB Ingress + EBS StorageClass
+    ├── azure/             # ACR image + AGIC Ingress + managed-premium
+    └── gcp/               # Artifact Registry + GCE Ingress + pd-ssd
+```
+
+### Aplicar por cloud
+
+```bash
+# AWS (EKS)
+kubectl apply -k infra/kubernetes/overlays/aws
+
+# Azure (AKS)
+kubectl apply -k infra/kubernetes/overlays/azure
+
+# GCP (GKE)
+kubectl apply -k infra/kubernetes/overlays/gcp
+```
+
+### Recursos criados
+
+| Recurso | Tipo | Descrição |
+|---|---|---|
+| `olist` | Namespace | Isolamento de todos os recursos |
+| `olist-config` | ConfigMap | Variáveis não-sensíveis |
+| `olist-secrets` | Secret | Credenciais (substituir por ESO em prod) |
+| `postgres` | Deployment + PVC | Banco da aplicação |
+| `postgres-keycloak` | Deployment + PVC | Banco do Keycloak |
+| `keycloak` | Deployment | Identity Provider |
+| `vault` | Deployment + Job | Gerenciador de segredos |
+| `olist-app` | Deployment | Aplicação Quarkus |
+| `olist-app-hpa` | HPA | Autoscaling 2–10 réplicas (CPU 70% / Mem 80%) |
+| `olist-ingress` | Ingress | Roteamento HTTP |
+
+---
+
+## Terraform — AWS / Azure / GCP
+
+Infraestrutura como código com **Terraform**, um diretório por cloud com backend remoto de state.
+
+```
+infra/terraform/
+├── modules/
+│   ├── k8s-cluster/       # Variáveis e outputs comuns de cluster
+│   ├── database/          # Variáveis e outputs comuns de banco
+│   └── registry/          # Variáveis e outputs comuns de registry
+├── aws/                   # EKS + RDS PostgreSQL + ECR
+├── azure/                 # AKS + Azure DB for PostgreSQL + ACR
+└── gcp/                   # GKE + Cloud SQL + Artifact Registry
+```
+
+### AWS — EKS
+
+| Recurso | Serviço AWS |
+|---|---|
+| Cluster Kubernetes | EKS 1.29 |
+| Nodes | EC2 t3.medium (autoscaling 1–5) |
+| Container Registry | ECR com scan on push |
+| Banco de dados | RDS PostgreSQL 14 (db.t3.micro) |
+| Rede | VPC + subnets privadas/públicas + NAT Gateway |
+| Ingress | AWS Load Balancer Controller (ALB) |
+| State backend | S3 + DynamoDB lock |
+
+```bash
+cd infra/terraform/aws
+cp terraform.tfvars.example terraform.tfvars
+# edite terraform.tfvars
+export TF_VAR_db_password="sua-senha"
+terraform init
+terraform plan
+terraform apply
+```
+
+### Azure — AKS
+
+| Recurso | Serviço Azure |
+|---|---|
+| Cluster Kubernetes | AKS 1.29 |
+| Nodes | Standard_D2s_v3 (autoscaling 1–5) |
+| Container Registry | ACR Standard |
+| Banco de dados | Azure Database for PostgreSQL Flexible Server |
+| Rede | VNet + subnet dedicada |
+| Ingress | Application Gateway Ingress Controller (AGIC) |
+| State backend | Azure Blob Storage |
+
+```bash
+cd infra/terraform/azure
+cp terraform.tfvars.example terraform.tfvars
+# edite terraform.tfvars
+export TF_VAR_db_password="sua-senha"
+terraform init
+terraform plan
+terraform apply
+```
+
+### GCP — GKE
+
+| Recurso | Serviço GCP |
+|---|---|
+| Cluster Kubernetes | GKE Autopilot-compatible 1.29 (STABLE channel) |
+| Nodes | e2-standard-2 (autoscaling 1–3 por zona) |
+| Container Registry | Artifact Registry |
+| Banco de dados | Cloud SQL PostgreSQL 14 (private IP) |
+| Rede | VPC + subnet com secondary ranges para pods/services |
+| Ingress | GCE Ingress + Static IP |
+| State backend | GCS Bucket |
+
+```bash
+cd infra/terraform/gcp
+cp terraform.tfvars.example terraform.tfvars
+# edite terraform.tfvars com seu project_id
+export TF_VAR_db_password="sua-senha"
+terraform init
+terraform plan
+terraform apply
+```
+
+### Fluxo completo (exemplo AWS)
+
+```bash
+# 1. Provisionar infraestrutura
+cd infra/terraform/aws && terraform apply
+
+# 2. Configurar kubectl
+aws eks update-kubeconfig --region us-east-1 --name olist-eks
+
+# 3. Build e push da imagem
+docker build -t <ACCOUNT>.dkr.ecr.us-east-1.amazonaws.com/olist-app:latest .
+aws ecr get-login-password | docker login --username AWS --password-stdin <ACCOUNT>.dkr.ecr.us-east-1.amazonaws.com
+docker push <ACCOUNT>.dkr.ecr.us-east-1.amazonaws.com/olist-app:latest
+
+# 4. Deploy no Kubernetes
+kubectl apply -k infra/kubernetes/overlays/aws
+
+# 5. Verificar
+kubectl get pods -n olist
+kubectl get ingress -n olist
+```
 
 ---
 

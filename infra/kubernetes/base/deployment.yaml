@@ -1,0 +1,106 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: olist-app
+  namespace: olist
+  labels:
+    app: olist-app
+    version: "1.0.0"
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: olist-app
+  template:
+    metadata:
+      labels:
+        app: olist-app
+        version: "1.0.0"
+    spec:
+      initContainers:
+        - name: wait-postgres
+          image: busybox:1.36
+          command: ["sh", "-c", "until nc -z postgres-service 5432; do echo waiting for postgres; sleep 2; done"]
+        - name: wait-vault
+          image: busybox:1.36
+          command: ["sh", "-c", "until nc -z vault-service 8200; do echo waiting for vault; sleep 2; done"]
+      containers:
+        - name: olist-app
+          image: olist-app:latest  # substituído pelo overlay de cada cloud
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8081
+          envFrom:
+            - configMapRef:
+                name: olist-config
+          env:
+            - name: QUARKUS_VAULT_AUTHENTICATION_CLIENT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: olist-secrets
+                  key: VAULT_TOKEN
+            - name: QUARKUS_OIDC_CREDENTIALS_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: olist-secrets
+                  key: KEYCLOAK_CLIENT_SECRET
+          readinessProbe:
+            httpGet:
+              path: /api/v1/health
+              port: 8081
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 5
+          livenessProbe:
+            httpGet:
+              path: /api/v1/health
+              port: 8081
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            failureThreshold: 3
+          resources:
+            requests:
+              memory: 256Mi
+              cpu: 250m
+            limits:
+              memory: 512Mi
+              cpu: 500m
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: olist-app-service
+  namespace: olist
+spec:
+  selector:
+    app: olist-app
+  ports:
+    - port: 80
+      targetPort: 8081
+  type: ClusterIP
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: olist-app-hpa
+  namespace: olist
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: olist-app
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
