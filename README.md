@@ -29,6 +29,7 @@ Os dados utilizados são do dataset público **Olist Brazilian E-Commerce** (Kag
 - [HATEOAS — Nível 3 de Maturidade](#hateoas--nível-3-de-maturidade)
 - [Rate Limiting](#rate-limiting)
 - [Refresh Token](#refresh-token)
+- [Modelo de Dados — DER](#modelo-de-dados--der)
 - [Liquibase — Versionamento do Banco](#liquibase--versionamento-do-banco)
 - [Testes](#testes)
 - [Docker e Docker Compose](#docker-e-docker-compose)
@@ -56,8 +57,13 @@ Os dados utilizados são do dataset público **Olist Brazilian E-Commerce** (Kag
               │  AuthResource               │  HATEOAS Level 3
               │  CustomerResource           │
               │  OrderResource              │
+              │  OrderItemResource          │
+              │  OrderPaymentResource       │
+              │  OrderReviewResource        │
               │  ProductResource            │
               │  SellerResource             │
+              │  GeolocationResource        │
+              │  UserResource               │
               │  HealthResource             │
               └─────────────┬──────────────┘
                             │
@@ -66,8 +72,12 @@ Os dados utilizados são do dataset público **Olist Brazilian E-Commerce** (Kag
               │  AuthService                │
               │  CustomerService            │
               │  OrderService               │
+              │  OrderItemService           │
+              │  OrderPaymentService        │
+              │  OrderReviewService         │
               │  ProductService             │
               │  SellerService              │
+              │  GeolocationService         │
               └─────────────┬──────────────┘
                             │
         ┌───────────────────┼───────────────────┐
@@ -460,6 +470,39 @@ curl -X POST http://localhost:8081/api/v1/auth/login \
 | `PUT` | `/api/v1/sellers/{id}` | Atualiza seller | MANAGER |
 | `DELETE` | `/api/v1/sellers/{id}` | Remove seller | ADMIN |
 
+### Order Items
+
+| Método | Endpoint | Descrição | Role |
+|---|---|---|---|
+| `GET` | `/api/v1/orders/{orderId}/items` | Lista itens do pedido | USER |
+| `POST` | `/api/v1/orders/{orderId}/items` | Adiciona item ao pedido | MANAGER |
+| `DELETE` | `/api/v1/orders/{orderId}/items` | Remove todos os itens | ADMIN |
+
+### Order Payments
+
+| Método | Endpoint | Descrição | Role |
+|---|---|---|---|
+| `GET` | `/api/v1/orders/{orderId}/payments` | Lista pagamentos do pedido | USER |
+| `POST` | `/api/v1/orders/{orderId}/payments` | Adiciona pagamento ao pedido | MANAGER |
+| `DELETE` | `/api/v1/orders/{orderId}/payments` | Remove todos os pagamentos | ADMIN |
+
+### Order Reviews
+
+| Método | Endpoint | Descrição | Role |
+|---|---|---|---|
+| `GET` | `/api/v1/orders/{orderId}/reviews` | Lista reviews do pedido | USER |
+| `GET` | `/api/v1/reviews/{reviewId}` | Busca review por ID | USER |
+| `POST` | `/api/v1/reviews` | Cria review | MANAGER |
+| `PUT` | `/api/v1/reviews/{reviewId}` | Atualiza review | MANAGER |
+| `DELETE` | `/api/v1/reviews/{reviewId}` | Remove review | ADMIN |
+
+### Geolocation
+
+| Método | Endpoint | Descrição | Role |
+|---|---|---|---|
+| `GET` | `/api/v1/geolocation/zip/{zipCode}` | Busca por CEP (paginado) | USER |
+| `GET` | `/api/v1/geolocation/state/{state}` | Busca por estado (paginado) | USER |
+
 ### Users
 
 | Método | Endpoint | Descrição | Role |
@@ -624,18 +667,64 @@ X-RateLimit-Remaining: 87
 
 ---
 
-## Liquibase — Versionamento do Banco
+## Modelo de Dados — DER
 
-### Changelogs
+![DER](DER.png)
 
-| Arquivo | Descrição |
-|---|---|
-| `001-create-tables.xml` | Criação de todas as tabelas e FKs |
-| `002-create-indexes.xml` | Índices para performance |
-| `003-import-data.xml` | Importação dos CSVs do dataset Olist |
-| `004-add-sequences.xml` | Sequences para Hibernate Reactive Panache |
+O diagrama acima representa o **Diagrama Entidade-Relacionamento** completo do banco de dados, baseado no dataset público **Olist Brazilian E-Commerce**.
 
-### Tabelas e volumes de dados
+### Entidades e relacionamentos
+
+**`customers`** — Compradores cadastrados na plataforma.
+- Chave primária: `customer_id`
+- `customer_unique_id` identifica o comprador de forma única entre pedidos distintos (um mesmo comprador pode ter múltiplos `customer_id`)
+- Relacionamento: 1 customer → N orders
+
+**`sellers`** — Vendedores que oferecem produtos na plataforma.
+- Chave primária: `seller_id`
+- Relacionamento: 1 seller → N order_items
+
+**`products`** — Catálogo de produtos disponíveis.
+- Chave primária: `product_id`
+- Contém dimensões físicas e metadados de categoria
+- Relacionamento: 1 product → N order_items
+
+**`orders`** — Pedidos realizados pelos clientes.
+- Chave primária: `order_id`
+- FK: `customer_id` → `customers`
+- Armazena todo o ciclo de vida do pedido: `purchased → approved → carrier → delivered`
+- Relacionamento: 1 order → N order_items, N order_payments, N order_reviews
+
+**`order_items`** — Itens individuais de cada pedido (chave composta).
+- Chave primária composta: `(order_id, order_item_id)`
+- FK: `order_id` → `orders`
+- Vincula produto, vendedor, preço e frete de cada item
+
+**`order_payments`** — Pagamentos associados a um pedido (chave composta).
+- Chave primária composta: `(order_id, payment_sequential)`
+- FK: `order_id` → `orders`
+- Um pedido pode ter múltiplos pagamentos (ex: cartão + voucher)
+
+**`order_reviews`** — Avaliações feitas pelos clientes após a entrega.
+- Chave primária: `review_id`
+- FK: `order_id` → `orders`
+- Contém score (1–5), título e mensagem do comentário
+
+**`geolocation`** — Base de coordenadas geográficas por CEP.
+- Chave primária: `id` (auto-gerado)
+- Não possui FK — é uma tabela de referência independente
+- Permite enriquecer endereços de customers e sellers com lat/lng
+
+**`product_category_translation`** — Tradução das categorias de produto para inglês.
+- Chave primária: `product_category_name`
+- Tabela de lookup sem FK — usada para internacionalização
+
+**`refresh_tokens`** — Tokens de refresh gerenciados pela aplicação.
+- Chave primária: `id` (auto-gerado)
+- Armazena token, username, data de expiração e flag de revogação
+- Não faz parte do modelo Olist — é infraestrutura de autenticação
+
+### Volumes de dados importados
 
 | Tabela | Registros |
 |---|---|
@@ -646,7 +735,20 @@ X-RateLimit-Remaining: 87
 | `order_items` | 112.650 |
 | `order_payments` | 103.886 |
 | `order_reviews` | 99.224 |
-| `refresh_tokens` | — |
+| `geolocation` | 1.000.163 |
+
+---
+
+## Liquibase — Versionamento do Banco
+
+### Changelogs
+
+| Arquivo | Descrição |
+|---|---|
+| `001-create-tables.xml` | Criação de todas as tabelas e FKs |
+| `002-create-indexes.xml` | Índices para performance |
+| `003-import-data.xml` | Importação dos CSVs do dataset Olist |
+| `004-add-sequences.xml` | Sequences para Hibernate Reactive Panache |
 
 ---
 
