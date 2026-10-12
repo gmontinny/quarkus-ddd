@@ -1,0 +1,3 @@
+-- This file is executed by PostgreSQL on first startup
+-- The olist database is already created via POSTGRES_DB env var
+-- Additional setup if needed goes here

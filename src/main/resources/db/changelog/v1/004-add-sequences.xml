@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <!-- Hibernate Reactive PanacheEntity espera sequence com nome <table>_SEQ -->
+    <changeSet id="004-add-refresh-tokens-seq" author="olist">
+        <preConditions onFail="MARK_RAN">
+            <not><sequenceExists sequenceName="refresh_tokens_SEQ"/></not>
+        </preConditions>
+        <createSequence sequenceName="refresh_tokens_SEQ" startValue="1" incrementBy="50"/>
+    </changeSet>
+
+</databaseChangeLog>

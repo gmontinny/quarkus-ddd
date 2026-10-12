@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="001-create-customers" author="olist">
+        <createTable tableName="customers">
+            <column name="customer_id" type="VARCHAR(50)">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="customer_unique_id" type="VARCHAR(50)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="customer_zip_code_prefix" type="VARCHAR(10)"/>
+            <column name="customer_city" type="VARCHAR(100)"/>
+            <column name="customer_state" type="VARCHAR(2)"/>
+        </createTable>
+    </changeSet>
+
+    <changeSet id="001-create-sellers" author="olist">
+        <createTable tableName="sellers">
+            <column name="seller_id" type="VARCHAR(50)">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="seller_zip_code_prefix" type="VARCHAR(10)"/>
+            <column name="seller_city" type="VARCHAR(100)"/>
+            <column name="seller_state" type="VARCHAR(2)"/>
+        </createTable>
+    </changeSet>
+
+    <changeSet id="001-create-products" author="olist">
+        <createTable tableName="products">
+            <column name="product_id" type="VARCHAR(50)">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="product_category_name" type="VARCHAR(100)"/>
+            <column name="product_name_lenght" type="INTEGER"/>
+            <column name="product_description_lenght" type="INTEGER"/>
+            <column name="product_photos_qty" type="INTEGER"/>
+            <column name="product_weight_g" type="INTEGER"/>
+            <column name="product_length_cm" type="INTEGER"/>
+            <column name="product_height_cm" type="INTEGER"/>
+            <column name="product_width_cm" type="INTEGER"/>
+        </createTable>
+    </changeSet>
+
+    <changeSet id="001-create-geolocation" author="olist">
+        <createTable tableName="geolocation">
+            <column name="id" type="BIGSERIAL">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="geolocation_zip_code_prefix" type="VARCHAR(10)"/>
+            <column name="geolocation_lat" type="DOUBLE PRECISION"/>
+            <column name="geolocation_lng" type="DOUBLE PRECISION"/>
+            <column name="geolocation_city" type="VARCHAR(100)"/>
+            <column name="geolocation_state" type="VARCHAR(2)"/>
+        </createTable>
+    </changeSet>
+
+    <changeSet id="001-create-orders" author="olist">
+        <createTable tableName="orders">
+            <column name="order_id" type="VARCHAR(50)">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="customer_id" type="VARCHAR(50)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="order_status" type="VARCHAR(30)"/>
+            <column name="order_purchase_timestamp" type="TIMESTAMP"/>
+            <column name="order_approved_at" type="TIMESTAMP"/>
+            <column name="order_delivered_carrier_date" type="TIMESTAMP"/>
+            <column name="order_delivered_customer_date" type="TIMESTAMP"/>
+            <column name="order_estimated_delivery_date" type="TIMESTAMP"/>
+        </createTable>
+        <addForeignKeyConstraint
+                baseTableName="orders" baseColumnNames="customer_id"
+                referencedTableName="customers" referencedColumnNames="customer_id"
+                constraintName="fk_orders_customer"/>
+    </changeSet>
+
+    <changeSet id="001-create-order-items" author="olist">
+        <createTable tableName="order_items">
+            <column name="order_id" type="VARCHAR(50)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="order_item_id" type="INTEGER">
+                <constraints nullable="false"/>
+            </column>
+            <column name="product_id" type="VARCHAR(50)"/>
+            <column name="seller_id" type="VARCHAR(50)"/>
+            <column name="shipping_limit_date" type="TIMESTAMP"/>
+            <column name="price" type="DECIMAL(10,2)"/>
+            <column name="freight_value" type="DECIMAL(10,2)"/>
+        </createTable>
+        <addPrimaryKey tableName="order_items" columnNames="order_id,order_item_id" constraintName="pk_order_items"/>
+        <addForeignKeyConstraint
+                baseTableName="order_items" baseColumnNames="order_id"
+                referencedTableName="orders" referencedColumnNames="order_id"
+                constraintName="fk_order_items_order"/>
+    </changeSet>
+
+    <changeSet id="001-create-order-payments" author="olist">
+        <createTable tableName="order_payments">
+            <column name="order_id" type="VARCHAR(50)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="payment_sequential" type="INTEGER">
+                <constraints nullable="false"/>
+            </column>
+            <column name="payment_type" type="VARCHAR(30)"/>
+            <column name="payment_installments" type="INTEGER"/>
+            <column name="payment_value" type="DECIMAL(10,2)"/>
+        </createTable>
+        <addPrimaryKey tableName="order_payments" columnNames="order_id,payment_sequential" constraintName="pk_order_payments"/>
+        <addForeignKeyConstraint
+                baseTableName="order_payments" baseColumnNames="order_id"
+                referencedTableName="orders" referencedColumnNames="order_id"
+                constraintName="fk_order_payments_order"/>
+    </changeSet>
+
+    <changeSet id="001-create-order-reviews" author="olist">
+        <createTable tableName="order_reviews">
+            <column name="review_id" type="VARCHAR(50)">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="order_id" type="VARCHAR(50)"/>
+            <column name="review_score" type="INTEGER"/>
+            <column name="review_comment_title" type="VARCHAR(255)"/>
+            <column name="review_comment_message" type="TEXT"/>
+            <column name="review_creation_date" type="TIMESTAMP"/>
+            <column name="review_answer_timestamp" type="TIMESTAMP"/>
+        </createTable>
+        <addForeignKeyConstraint
+                baseTableName="order_reviews" baseColumnNames="order_id"
+                referencedTableName="orders" referencedColumnNames="order_id"
+                constraintName="fk_order_reviews_order"/>
+    </changeSet>
+
+    <changeSet id="001-create-product-category-translation" author="olist">
+        <createTable tableName="product_category_translation">
+            <column name="product_category_name" type="VARCHAR(100)">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="product_category_name_english" type="VARCHAR(100)"/>
+        </createTable>
+    </changeSet>
+
+    <changeSet id="001-create-refresh-tokens" author="olist">
+        <createTable tableName="refresh_tokens">
+            <column name="id" type="BIGSERIAL">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="token" type="VARCHAR(512)">
+                <constraints nullable="false" unique="true"/>
+            </column>
+            <column name="username" type="VARCHAR(100)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="expires_at" type="TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="revoked" type="BOOLEAN" defaultValueBoolean="false"/>
+        </createTable>
+    </changeSet>
+
+</databaseChangeLog>

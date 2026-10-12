@@ -1,0 +1,80 @@
+plugins {
+    id 'java'
+    id 'io.quarkus'
+}
+
+repositories {
+    mavenCentral()
+    mavenLocal()
+}
+
+dependencies {
+    implementation enforcedPlatform("${quarkusPlatformGroupId}:${quarkusPlatformArtifactId}:${quarkusPlatformVersion}")
+
+    // REST Reactive
+    implementation 'io.quarkus:quarkus-rest'
+    implementation 'io.quarkus:quarkus-rest-jackson'
+    implementation 'io.quarkus:quarkus-rest-client-jackson'
+
+    // Reactive PostgreSQL + Hibernate
+    implementation 'io.quarkus:quarkus-reactive-pg-client'
+    implementation 'io.quarkus:quarkus-hibernate-reactive-panache'
+
+    // JDBC (necessário para Liquibase)
+    implementation 'io.quarkus:quarkus-jdbc-postgresql'
+
+    // Security — Keycloak OIDC + JWT
+    implementation 'io.quarkus:quarkus-oidc'
+    implementation 'io.quarkus:quarkus-smallrye-jwt'
+    implementation 'io.quarkus:quarkus-smallrye-jwt-build'
+
+    // Vault — grupo correto: io.quarkiverse.vault (fora do BOM do Quarkus)
+    implementation 'io.quarkiverse.vault:quarkus-vault:4.2.1'
+
+    // Liquibase
+    implementation 'io.quarkus:quarkus-liquibase'
+
+    // OpenAPI / Swagger
+    implementation 'io.quarkus:quarkus-smallrye-openapi'
+
+    // Fault Tolerance
+    implementation 'io.quarkus:quarkus-smallrye-fault-tolerance'
+
+    // Scheduler
+    implementation 'io.quarkus:quarkus-scheduler'
+
+    // Bean Validation
+    implementation 'io.quarkus:quarkus-hibernate-validator'
+
+    // YAML config support
+    implementation 'io.quarkus:quarkus-config-yaml'
+
+    // CDI
+    implementation 'io.quarkus:quarkus-arc'
+
+    // Test
+    testImplementation 'io.quarkus:quarkus-junit5'
+    testImplementation 'io.quarkus:quarkus-junit5-mockito'
+    testImplementation 'io.rest-assured:rest-assured'
+    testImplementation 'io.quarkus:quarkus-test-security'
+    testImplementation 'io.quarkus:quarkus-test-security-jwt'
+    testImplementation 'io.quarkus:quarkus-panache-mock'
+    testImplementation 'io.quarkus:quarkus-test-vertx'
+}
+
+group = 'br.com'
+version = '1.0-SNAPSHOT'
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+}
+
+compileJava {
+    options.encoding = 'UTF-8'
+    options.compilerArgs << '-parameters'
+}
+
+compileTestJava {
+    options.encoding = 'UTF-8'
+}

@@ -1,0 +1,31 @@
+# Build output
+build/
+.gradle/
+
+# IDE files
+*.iml
+.idea/
+.vscode/
+
+# Git
+.git/
+.gitignore
+
+# Docker
+Dockerfile
+docker-compose.yml
+docker/
+
+# Docs
+README.md
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Keycloak config (not needed in app image)
+keycloak/
+
+# Test resources
+src/test/
+src/native-test/

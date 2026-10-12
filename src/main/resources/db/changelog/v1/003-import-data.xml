@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="003-import-customers" author="olist" runOnChange="false">
+        <loadData tableName="customers"
+                  file="data/olist_customers_dataset.csv"
+                  separator=","
+                  quotchar="&quot;"
+                  encoding="UTF-8">
+            <column name="customer_id" type="STRING"/>
+            <column name="customer_unique_id" type="STRING"/>
+            <column name="customer_zip_code_prefix" type="STRING"/>
+            <column name="customer_city" type="STRING"/>
+            <column name="customer_state" type="STRING"/>
+        </loadData>
+    </changeSet>
+
+    <changeSet id="003-import-sellers" author="olist" runOnChange="false">
+        <loadData tableName="sellers"
+                  file="data/olist_sellers_dataset.csv"
+                  separator=","
+                  quotchar="&quot;"
+                  encoding="UTF-8">
+            <column name="seller_id" type="STRING"/>
+            <column name="seller_zip_code_prefix" type="STRING"/>
+            <column name="seller_city" type="STRING"/>
+            <column name="seller_state" type="STRING"/>
+        </loadData>
+    </changeSet>
+
+    <changeSet id="003-import-products" author="olist" runOnChange="false">
+        <loadData tableName="products"
+                  file="data/olist_products_dataset.csv"
+                  separator=","
+                  quotchar="&quot;"
+                  encoding="UTF-8">
+            <column name="product_id" type="STRING"/>
+            <column name="product_category_name" type="STRING"/>
+            <column name="product_name_lenght" type="NUMERIC"/>
+            <column name="product_description_lenght" type="NUMERIC"/>
+            <column name="product_photos_qty" type="NUMERIC"/>
+            <column name="product_weight_g" type="NUMERIC"/>
+            <column name="product_length_cm" type="NUMERIC"/>
+            <column name="product_height_cm" type="NUMERIC"/>
+            <column name="product_width_cm" type="NUMERIC"/>
+        </loadData>
+    </changeSet>
+
+    <changeSet id="003-import-category-translation" author="olist" runOnChange="false">
+        <loadData tableName="product_category_translation"
+                  file="data/product_category_name_translation.csv"
+                  separator=","
+                  quotchar="&quot;"
+                  encoding="UTF-8">
+            <column name="product_category_name" type="STRING"/>
+            <column name="product_category_name_english" type="STRING"/>
+        </loadData>
+    </changeSet>
+
+    <changeSet id="003-import-orders" author="olist" runOnChange="false">
+        <loadData tableName="orders"
+                  file="data/olist_orders_dataset.csv"
+                  separator=","
+                  quotchar="&quot;"
+                  encoding="UTF-8">
+            <column name="order_id" type="STRING"/>
+            <column name="customer_id" type="STRING"/>
+            <column name="order_status" type="STRING"/>
+            <column name="order_purchase_timestamp" type="DATE"/>
+            <column name="order_approved_at" type="DATE"/>
+            <column name="order_delivered_carrier_date" type="DATE"/>
+            <column name="order_delivered_customer_date" type="DATE"/>
+            <column name="order_estimated_delivery_date" type="DATE"/>
+        </loadData>
+    </changeSet>
+
+    <changeSet id="003-import-order-items" author="olist" runOnChange="false">
+        <loadData tableName="order_items"
+                  file="data/olist_order_items_dataset.csv"
+                  separator=","
+                  quotchar="&quot;"
+                  encoding="UTF-8">
+            <column name="order_id" type="STRING"/>
+            <column name="order_item_id" type="NUMERIC"/>
+            <column name="product_id" type="STRING"/>
+            <column name="seller_id" type="STRING"/>
+            <column name="shipping_limit_date" type="DATE"/>
+            <column name="price" type="NUMERIC"/>
+            <column name="freight_value" type="NUMERIC"/>
+        </loadData>
+    </changeSet>
+
+    <changeSet id="003-import-order-payments" author="olist" runOnChange="false">
+        <loadData tableName="order_payments"
+                  file="data/olist_order_payments_dataset.csv"
+                  separator=","
+                  quotchar="&quot;"
+                  encoding="UTF-8">
+            <column name="order_id" type="STRING"/>
+            <column name="payment_sequential" type="NUMERIC"/>
+            <column name="payment_type" type="STRING"/>
+            <column name="payment_installments" type="NUMERIC"/>
+            <column name="payment_value" type="NUMERIC"/>
+        </loadData>
+    </changeSet>
+
+    <changeSet id="003-import-order-reviews" author="olist" runOnChange="false">
+        <loadUpdateData tableName="order_reviews"
+                  file="data/olist_order_reviews_dataset.csv"
+                  separator=","
+                  quotchar="&quot;"
+                  encoding="UTF-8"
+                  primaryKey="review_id">
+            <column name="review_id" type="STRING"/>
+            <column name="order_id" type="STRING"/>
+            <column name="review_score" type="NUMERIC"/>
+            <column name="review_comment_title" type="STRING"/>
+            <column name="review_comment_message" type="STRING"/>
+            <column name="review_creation_date" type="DATE"/>
+            <column name="review_answer_timestamp" type="DATE"/>
+        </loadUpdateData>
+    </changeSet>
+
+</databaseChangeLog>
