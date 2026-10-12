@@ -102,6 +102,14 @@
   ],
   "users": [
     {
+      "username": "service-account-spring-webflux-client",
+      "enabled": true,
+      "serviceAccountClientId": "spring-webflux-client",
+      "clientRoles": {
+        "realm-management": ["manage-users", "view-users", "query-users", "view-realm", "manage-realm"]
+      }
+    },
+    {
       "username": "admin",
       "enabled": true,
       "emailVerified": true,

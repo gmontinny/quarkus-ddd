@@ -22,13 +22,14 @@ Os dados utilizados são do dataset público **Olist Brazilian E-Commerce** (Kag
 - [Pré-requisitos](#pré-requisitos)
 - [Configuração e Execução](#configuração-e-execução)
 - [Variáveis de Ambiente e Vault](#variáveis-de-ambiente-e-vault)
+- [Gerenciamento de Usuários](#gerenciamento-de-usuários)
 - [Segurança — Keycloak e JWT](#segurança--keycloak-e-jwt)
 - [Endpoints da API](#endpoints-da-api)
+- [Swagger UI — Como Usar](#swagger-ui--como-usar)
 - [HATEOAS — Nível 3 de Maturidade](#hateoas--nível-3-de-maturidade)
 - [Rate Limiting](#rate-limiting)
 - [Refresh Token](#refresh-token)
 - [Liquibase — Versionamento do Banco](#liquibase--versionamento-do-banco)
-- [Swagger UI](#swagger-ui)
 - [Testes](#testes)
 - [Docker e Docker Compose](#docker-e-docker-compose)
 - [Boas Práticas Aplicadas](#boas-práticas-aplicadas)
@@ -128,7 +129,7 @@ Núcleo do negócio. Não depende de nenhuma outra camada.
 
 ### `application/`
 Orquestra os casos de uso. Depende apenas do `domain/`.
-- **service/** — Serviços de aplicação (`AuthService`, `CustomerService`, `OrderService`, `ProductService`, `SellerService`)
+- **service/** — Serviços de aplicação com `@WithSession` (leitura) e `@WithTransaction` (escrita)
 - **dto/request/** — Objetos de entrada validados com Bean Validation
 - **dto/response/** — Objetos de saída com links HATEOAS (`PageResponse<T>`, `Link`, `TokenResponse`)
 - **mapper/** — Conversão entre domínio e DTOs
@@ -136,9 +137,9 @@ Orquestra os casos de uso. Depende apenas do `domain/`.
 ### `infrastructure/`
 Implementações técnicas. Depende do `domain/`.
 - **repository/** — Implementações Panache Reactive dos repositórios
-- **security/** — Cliente Keycloak para troca de tokens (`KeycloakAuthService`, `KeycloakTokenClient`, `KeycloakTokenResponse`)
+- **security/** — Cliente Keycloak para troca de tokens (`KeycloakAuthService`, `KeycloakTokenClient`)
 - **ratelimit/** — Filtro JAX-RS de Rate Limiting (`RateLimitFilter`)
-- **config/** — OpenAPI config, Exception Mapper global (`GlobalExceptionMapper`, `OpenApiConfig`)
+- **config/** — OpenAPI config, Exception Mapper global
 
 ### `interfaces/`
 Ponto de entrada HTTP. Depende do `application/`.
@@ -150,66 +151,42 @@ Ponto de entrada HTTP. Depende do `application/`.
 
 ```
 quarkus-ddd/
-├── data/                                    # CSVs do dataset Olist
-│   ├── olist_customers_dataset.csv
-│   ├── olist_orders_dataset.csv
-│   ├── olist_order_items_dataset.csv
-│   ├── olist_order_payments_dataset.csv
-│   ├── olist_order_reviews_dataset.csv
-│   ├── olist_products_dataset.csv
-│   ├── olist_sellers_dataset.csv
-│   ├── olist_geolocation_dataset.csv
-│   └── product_category_name_translation.csv
+├── data/                                    # CSVs do dataset Olist (referência)
 ├── docker/
 │   └── init-db.sql
 ├── keycloak/
 │   └── conf/
-│       └── realm-export.json                # Realm pré-configurado
+│       └── realm-export.json
 ├── src/
 │   ├── main/
 │   │   ├── java/br/com/
 │   │   │   ├── domain/
-│   │   │   │   ├── model/                   # Entidades JPA
-│   │   │   │   ├── repository/              # Interfaces de repositório
-│   │   │   │   └── exception/               # Exceções de domínio
 │   │   │   ├── application/
-│   │   │   │   ├── service/                 # Casos de uso
-│   │   │   │   ├── dto/
-│   │   │   │   │   ├── request/             # DTOs de entrada
-│   │   │   │   │   └── response/            # DTOs de saída + HATEOAS
-│   │   │   │   └── mapper/                  # Conversores
 │   │   │   ├── infrastructure/
-│   │   │   │   ├── repository/              # Panache Reactive impls
-│   │   │   │   ├── security/                # Keycloak client
-│   │   │   │   ├── ratelimit/               # Rate limit filter
-│   │   │   │   └── config/                  # OpenAPI, ExceptionMapper
 │   │   │   ├── interfaces/
-│   │   │   │   └── rest/                    # JAX-RS Resources
-│   │   │   └── HealthResource.java          # Health check (br.com raiz)
+│   │   │   └── HealthResource.java
 │   │   └── resources/
-│   │       ├── application.yml
+│   │       ├── application.properties
+│   │       ├── data/                        # CSVs no classpath (Liquibase)
 │   │       └── db/changelog/
 │   │           ├── db.changelog-master.xml
 │   │           └── v1/
 │   │               ├── 001-create-tables.xml
 │   │               ├── 002-create-indexes.xml
-│   │               └── 003-import-data.xml
+│   │               ├── 003-import-data.xml
+│   │               └── 004-add-sequences.xml
 │   └── test/
 │       ├── java/br/com/
-│       │   ├── interfaces/rest/
-│       │   │   ├── AuthResourceTest.java
-│       │   │   ├── CustomerResourceTest.java
-│       │   │   └── ProductResourceTest.java
-│       │   ├── application/service/
-│       │   │   └── OrderServiceTest.java
-│       │   └── ExampleResourceTest.java
 │       └── resources/
-│           └── application.yml
-├── .env.example                             # Template de variáveis de ambiente
-├── Dockerfile                               # Multi-stage build
-├── docker-compose.yml                       # Orquestração completa
+│           ├── publicKey.pem
+│           └── privateKey.pem
+├── .env
+├── .env.example
+├── Dockerfile
+├── docker-compose.yml
+├── dev.bat
+├── dev.sh
 ├── build.gradle
-├── gradle.properties
 └── settings.gradle
 ```
 
@@ -242,7 +219,33 @@ cp .env.example .env
 # Edite o .env com seus valores
 ```
 
-### 3. Subir a infraestrutura completa (recomendado)
+### 3. Subir a infraestrutura (PostgreSQL + Keycloak + Vault)
+
+```bash
+docker compose up postgres postgres-keycloak keycloak vault vault-init -d
+```
+
+Aguarde o Keycloak estar disponível em `http://localhost:8080` antes de continuar.
+
+### 4. Rodar em modo dev (recomendado)
+
+```bash
+# Windows
+dev.bat
+
+# Linux/macOS
+./dev.sh
+```
+
+O script `dev.bat` / `dev.sh` executa automaticamente:
+1. Encerra processos Java em execução
+2. Recria secrets no Vault local
+3. Executa `clean`
+4. Inicia `quarkusDev`
+
+A aplicação estará disponível em: `http://localhost:8081`
+
+### 5. Subir tudo via Docker Compose
 
 ```bash
 docker compose up --build
@@ -252,74 +255,38 @@ Ordem de inicialização garantida pelo `depends_on`:
 1. `postgres` e `postgres-keycloak` — aguardam healthcheck
 2. `keycloak` — aguarda `postgres-keycloak` healthy
 3. `vault` — inicia em modo dev
-4. `vault-init` — grava os secrets no Vault após Vault healthy
+4. `vault-init` — grava os secrets no Vault
 5. `app` — aguarda `postgres` healthy + `vault-init` completed
 
-### 4. Subir apenas a infraestrutura (modo dev local)
+### 6. Build manual
 
 ```bash
-# Sobe apenas PostgreSQL, Keycloak e Vault
-docker compose up postgres postgres-keycloak keycloak vault vault-init
-
-# Em outro terminal, rode a aplicação em modo dev
-./gradlew quarkusDev
-```
-
-A aplicação estará disponível em: `http://localhost:8081`
-
-### 5. Build manual
-
-```bash
-# Build padrão (fast-jar)
-./gradlew build
-
-# Build pulando testes
 ./gradlew build -x test
-
-# Executar o jar gerado
 java -jar build/quarkus-app/quarkus-run.jar
-```
-
-### 6. Build nativo (GraalVM)
-
-```bash
-# Com GraalVM instalado
-./gradlew build -Dquarkus.native.enabled=true
-
-# Sem GraalVM (via container)
-./gradlew build -Dquarkus.native.enabled=true -Dquarkus.native.container-build=true
 ```
 
 ---
 
 ## Variáveis de Ambiente e Vault
 
-### Como funciona
+### Perfis de configuração
 
-O Quarkus Vault Extension (`io.quarkiverse.vault:quarkus-vault:4.2.1`) injeta automaticamente os segredos do Vault como propriedades de configuração. Os valores definidos em `secret/olist-app` ficam disponíveis como `${db.username}`, `${db.password}`, etc., no `application.yml`.
+| Perfil | Vault | Credenciais |
+|---|---|---|
+| `dev` | Desabilitado | Lidas diretamente do `.env` |
+| `prod` (Docker) | Habilitado | Injetadas pelo Vault |
+| `test` | Desabilitado | Hardcoded no `application.properties` |
 
-### Secrets armazenados no Vault
+### Secrets armazenados no Vault (prod)
 
 | Chave | Descrição |
 |---|---|
 | `db.username` | Usuário do PostgreSQL |
 | `db.password` | Senha do PostgreSQL |
-| `db.host` | Host do PostgreSQL |
 | `db.port` | Porta do PostgreSQL |
 | `db.name` | Nome do banco de dados |
 | `keycloak.client-secret` | Secret do client Keycloak |
 | `jwt.secret` | Chave de assinatura JWT |
-
-### Configuração do Vault no `application.yml`
-
-```yaml
-quarkus:
-  vault:
-    url: ${QUARKUS_VAULT_URL:http://localhost:8200}
-    authentication:
-      client-token: ${QUARKUS_VAULT_AUTHENTICATION_CLIENT_TOKEN:myroot}
-    secret-config-kv-path: ${VAULT_SECRET_PATH:secret/olist-app}
-```
 
 ### Acessar o Vault UI
 
@@ -328,27 +295,70 @@ URL:   http://localhost:8200
 Token: myroot
 ```
 
-### Verificar secrets via CLI
+---
+
+## Gerenciamento de Usuários
+
+Os usuários são gerenciados diretamente no **Keycloak** via Admin REST API. Não há tabela local de usuários — o Keycloak é a única fonte de verdade.
+
+### Usuários pré-configurados
+
+| Usuário | Senha | Roles |
+|---|---|---|
+| `admin` | `admin123` | `ROLE_ADMIN`, `ROLE_USER` |
+| `manager` | `manager123` | `ROLE_MANAGER`, `ROLE_USER` |
+| `user` | `user123` | `ROLE_USER` |
+
+### Criar usuário via API
+
+Apenas usuários com `ROLE_ADMIN` podem gerenciar usuários.
 
 ```bash
-docker exec -it vault vault kv get -address=http://127.0.0.1:8200 secret/olist-app
+# 1. Obter token de admin
+curl -X POST http://localhost:8081/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"admin123"}'
+
+# 2. Criar novo usuário
+curl -X POST http://localhost:8081/api/v1/users \
+  -H "Authorization: Bearer <access_token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "novousuario",
+    "email": "novo@example.com",
+    "firstName": "Novo",
+    "lastName": "Usuario",
+    "password": "senha123",
+    "role": "ROLE_USER"
+  }'
 ```
 
-### Variáveis de ambiente principais (`.env.example`)
+### Roles disponíveis
 
-| Variável | Descrição |
+| Role | Permissões |
 |---|---|
-| `APP_PORT` | Porta da aplicação (padrão: `8081`) |
-| `DB_HOST` / `DB_PORT` / `DB_NAME` | Conexão PostgreSQL |
-| `DB_USERNAME` / `DB_PASSWORD` | Credenciais PostgreSQL |
-| `KC_DB_*` | Banco dedicado do Keycloak |
-| `KEYCLOAK_PORT` | Porta do Keycloak (padrão: `8080`) |
-| `KEYCLOAK_REALM` | Realm (`spring-webflux`) |
-| `KEYCLOAK_CLIENT_ID` | Client ID (`spring-webflux-client`) |
-| `KEYCLOAK_CLIENT_SECRET` | Secret do client |
-| `VAULT_PORT` | Porta do Vault (padrão: `8200`) |
-| `VAULT_TOKEN` | Token root do Vault |
-| `VAULT_SECRET_PATH` | Caminho dos secrets (`secret/olist-app`) |
+| `ROLE_USER` | Leitura (GET) em todos os recursos |
+| `ROLE_MANAGER` | Leitura + Criação + Atualização |
+| `ROLE_ADMIN` | Acesso total, incluindo DELETE e gerência de usuários |
+
+### Exemplo de resposta
+
+```json
+{
+  "id": "00c8b045-9b9d-4161-b2d1-f73651c1ce4b",
+  "username": "novousuario",
+  "email": "novo@example.com",
+  "firstName": "Novo",
+  "lastName": "Usuario",
+  "enabled": true,
+  "roles": ["ROLE_USER"],
+  "links": [
+    { "rel": "self",   "href": "/api/v1/users/00c8b045...", "method": "GET" },
+    { "rel": "update", "href": "/api/v1/users/00c8b045...", "method": "PUT" },
+    { "rel": "delete", "href": "/api/v1/users/00c8b045...", "method": "DELETE" }
+  ]
+}
+```
 
 ---
 
@@ -356,7 +366,7 @@ docker exec -it vault vault kv get -address=http://127.0.0.1:8200 secret/olist-a
 
 ### Realm configurado
 
-O realm `spring-webflux` é importado automaticamente pelo Keycloak na inicialização via `realm-export.json`.
+O realm `spring-webflux` é importado automaticamente pelo Keycloak via `realm-export.json`. A service account do client `spring-webflux-client` possui as roles `manage-users`, `view-users`, `query-users`, `view-realm` e `manage-realm` do `realm-management`, permitindo o gerenciamento de usuários via API.
 
 ### Roles disponíveis
 
@@ -374,6 +384,8 @@ O realm `spring-webflux` é importado automaticamente pelo Keycloak na inicializ
 | `manager` | `manager123` | `ROLE_MANAGER`, `ROLE_USER` |
 | `user` | `user123` | `ROLE_USER` |
 
+Novos usuários podem ser criados via `POST /api/v1/users` (requer `ROLE_ADMIN`) ou pelo Keycloak Admin Console em `http://localhost:8080`.
+
 ### Fluxo de autenticação
 
 ```
@@ -387,22 +399,9 @@ O realm `spring-webflux` é importado automaticamente pelo Keycloak na inicializ
 ### Obter token via curl
 
 ```bash
-# Login
 curl -X POST http://localhost:8081/api/v1/auth/login \
   -H "Content-Type: application/json" \
   -d '{"username":"admin","password":"admin123"}'
-
-# Usar o token
-curl http://localhost:8081/api/v1/customers \
-  -H "Authorization: Bearer <access_token>"
-```
-
-### Acessar o Keycloak Admin Console
-
-```
-URL:      http://localhost:8080
-Usuário:  admin
-Senha:    admin
 ```
 
 ---
@@ -415,7 +414,7 @@ Senha:    admin
 |---|---|---|---|
 | `POST` | `/api/v1/auth/login` | Login — retorna access + refresh token | Público |
 | `POST` | `/api/v1/auth/refresh` | Renova o access token | Público |
-| `POST` | `/api/v1/auth/logout` | Revoga o refresh token no Keycloak | Autenticado |
+| `POST` | `/api/v1/auth/logout` | Revoga o refresh token | Autenticado |
 
 ### Customers
 
@@ -461,11 +460,114 @@ Senha:    admin
 | `PUT` | `/api/v1/sellers/{id}` | Atualiza seller | MANAGER |
 | `DELETE` | `/api/v1/sellers/{id}` | Remove seller | ADMIN |
 
+### Users
+
+| Método | Endpoint | Descrição | Role |
+|---|---|---|---|
+| `GET` | `/api/v1/users?page=0&size=20` | Lista todos os usuários | ADMIN |
+| `GET` | `/api/v1/users/{id}` | Busca usuário por ID | ADMIN |
+| `POST` | `/api/v1/users` | Cria usuário no Keycloak | ADMIN |
+| `PUT` | `/api/v1/users/{id}` | Atualiza usuário e role | ADMIN |
+| `DELETE` | `/api/v1/users/{id}` | Remove usuário do Keycloak | ADMIN |
+
 ### Health
 
 | Método | Endpoint | Descrição | Auth |
 |---|---|---|---|
 | `GET` | `/api/v1/health` | Status da aplicação | Público |
+
+---
+
+## Swagger UI — Como Usar
+
+### Acessar
+
+```
+Swagger UI:   http://localhost:8081/q/swagger-ui
+OpenAPI JSON: http://localhost:8081/q/openapi
+```
+
+### Passo a passo para autenticar e testar
+
+**1. Abra o Swagger UI**
+
+Acesse `http://localhost:8081/q/swagger-ui` no navegador.
+
+**2. Obtenha um token fazendo login**
+
+- Expanda a seção **Authentication**
+- Clique em `POST /api/v1/auth/login`
+- Clique em **Try it out**
+- Preencha o body com um dos usuários disponíveis:
+
+```json
+{
+  "username": "admin",
+  "password": "admin123"
+}
+```
+
+- Clique em **Execute**
+- Copie o valor do campo `accessToken` da resposta
+
+**3. Autorize o Swagger UI**
+
+- Clique no botão **Authorize** (cadeado 🔒) no topo da página
+- No campo **BearerAuth (http, Bearer)**, cole o `accessToken` copiado
+- Clique em **Authorize** e depois em **Close**
+
+**4. Teste os endpoints**
+
+Com o token configurado, todos os endpoints protegidos passarão a enviar o header `Authorization: Bearer <token>` automaticamente.
+
+Exemplo — listar customers:
+- Expanda **Customers**
+- Clique em `GET /api/v1/customers`
+- Clique em **Try it out**
+- Ajuste `page` e `size` se desejar
+- Clique em **Execute**
+
+**5. Tokens e expiração**
+
+O `accessToken` expira em **5 minutos**. Quando expirar:
+- Use `POST /api/v1/auth/refresh` com o `refreshToken` para obter um novo par de tokens
+- Repita o passo 3 com o novo `accessToken`
+
+### Usuários disponíveis para teste
+
+| Usuário | Senha | O que pode fazer no Swagger |
+|---|---|---|
+| `user` | `user123` | Apenas GET em todos os recursos |
+| `manager` | `manager123` | GET + POST + PUT |
+| `admin` | `admin123` | Acesso total (GET, POST, PUT, DELETE) |
+
+### Exemplo de resposta paginada
+
+```json
+{
+  "content": [
+    {
+      "customerId": "06b8999e2fba1a1fbc88172c00ba8bc7",
+      "customerCity": "franca",
+      "customerState": "SP",
+      "links": [
+        { "rel": "self",   "href": "/api/v1/customers/06b8999e...", "method": "GET" },
+        { "rel": "update", "href": "/api/v1/customers/06b8999e...", "method": "PUT" },
+        { "rel": "delete", "href": "/api/v1/customers/06b8999e...", "method": "DELETE" }
+      ]
+    }
+  ],
+  "page": 0,
+  "size": 20,
+  "totalElements": 99441,
+  "totalPages": 4973,
+  "links": [
+    { "rel": "self", "href": "/api/v1/customers?page=0&size=20", "method": "GET" },
+    { "rel": "next", "href": "/api/v1/customers?page=1&size=20", "method": "GET" },
+    { "rel": "prev", "href": "/api/v1/customers?page=0&size=20", "method": "GET" }
+  ]
+}
+```
 
 ---
 
@@ -486,32 +588,13 @@ Cada resposta inclui um array `links` com as ações disponíveis para aquele re
 }
 ```
 
-Respostas paginadas (`PageResponse<T>`) incluem links de navegação:
-
-```json
-{
-  "content": [...],
-  "page": 0,
-  "size": 20,
-  "totalElements": 99441,
-  "totalPages": 4973,
-  "links": [
-    { "rel": "self", "href": "/api/v1/customers?page=0&size=20", "method": "GET" },
-    { "rel": "next", "href": "/api/v1/customers?page=1&size=20", "method": "GET" },
-    { "rel": "prev", "href": "/api/v1/customers?page=0&size=20", "method": "GET" }
-  ]
-}
-```
-
 ---
 
 ## Rate Limiting
 
-Implementado via `RateLimitFilter` (JAX-RS `ContainerRequestFilter`, `@Priority(Priorities.USER - 100)`):
+Implementado via `RateLimitFilter` (JAX-RS `ContainerRequestFilter`):
 
 - **Limite:** 100 requisições por minuto por IP
-- **IP detectado via:** header `X-Forwarded-For`
-- **Janela:** fixa de 60 segundos (reset ao expirar)
 - **Headers de resposta:**
 
 ```
@@ -528,54 +611,20 @@ X-RateLimit-Remaining: 87
 }
 ```
 
-Headers adicionais na resposta 429:
-```
-Retry-After: 60
-X-RateLimit-Remaining: 0
-```
-
 ---
 
 ## Refresh Token
-
-O fluxo de Refresh Token é delegado inteiramente ao Keycloak via `KeycloakTokenClient` (REST Client reativo):
 
 ```
 1. Login  →  access_token (5 min) + refresh_token (30 min)
 2. access_token expirado  →  POST /api/v1/auth/refresh
 3. Keycloak valida o refresh_token e emite novos tokens
-4. Logout  →  POST /api/v1/auth/logout  →  revoga o refresh_token no Keycloak
-```
-
-### Configuração no `application.yml`
-
-```yaml
-quarkus:
-  oidc:
-    token:
-      refresh-expired: true
-      refresh-token-time-skew: 30S
-```
-
-### Exemplo de uso
-
-```bash
-# Refresh
-curl -X POST http://localhost:8081/api/v1/auth/refresh \
-  -H "Content-Type: application/json" \
-  -d '{"refreshToken":"<refresh_token>"}'
-
-# Logout
-curl -X POST http://localhost:8081/api/v1/auth/logout \
-  -H "Content-Type: application/json" \
-  -d '{"refreshToken":"<refresh_token>"}'
+4. Logout  →  POST /api/v1/auth/logout  →  revoga o refresh_token
 ```
 
 ---
 
 ## Liquibase — Versionamento do Banco
-
-As migrations são executadas automaticamente na inicialização (`migrate-at-start: true`) via datasource JDBC. O Hibernate ORM e o Hibernate Reactive têm `schema-management.action: none` para não conflitar com o Liquibase.
 
 ### Changelogs
 
@@ -584,37 +633,20 @@ As migrations são executadas automaticamente na inicialização (`migrate-at-st
 | `001-create-tables.xml` | Criação de todas as tabelas e FKs |
 | `002-create-indexes.xml` | Índices para performance |
 | `003-import-data.xml` | Importação dos CSVs do dataset Olist |
+| `004-add-sequences.xml` | Sequences para Hibernate Reactive Panache |
 
-### Tabelas criadas
+### Tabelas e volumes de dados
 
-| Tabela | Descrição |
+| Tabela | Registros |
 |---|---|
-| `customers` | 99.441 clientes |
-| `sellers` | 3.095 vendedores |
-| `products` | 32.951 produtos |
-| `orders` | 99.441 pedidos |
-| `order_items` | 112.650 itens de pedido |
-| `order_payments` | 103.886 pagamentos |
-| `order_reviews` | 99.224 avaliações |
-| `geolocation` | Dados de geolocalização por CEP |
-| `product_category_translation` | Tradução de categorias PT→EN |
-| `refresh_tokens` | Controle de refresh tokens |
-
----
-
-## Swagger UI
-
-```
-Swagger UI:   http://localhost:8081/q/swagger-ui
-OpenAPI JSON: http://localhost:8081/q/openapi
-```
-
-### Autenticar no Swagger UI
-
-1. Acesse `http://localhost:8081/q/swagger-ui`
-2. Clique em **Authorize** (cadeado)
-3. Faça login via `POST /api/v1/auth/login` para obter o token
-4. Cole o `accessToken` no campo **BearerAuth**
+| `customers` | 99.441 |
+| `sellers` | 3.095 |
+| `products` | 32.951 |
+| `orders` | 99.441 |
+| `order_items` | 112.650 |
+| `order_payments` | 103.886 |
+| `order_reviews` | 99.224 |
+| `refresh_tokens` | — |
 
 ---
 
@@ -633,7 +665,8 @@ src/test/java/br/com/
 ├── interfaces/rest/
 │   ├── AuthResourceTest.java       # Testes de integração — Auth
 │   ├── CustomerResourceTest.java   # Testes de integração — Customers
-│   └── ProductResourceTest.java    # Testes de integração — Products
+│   ├── ProductResourceTest.java    # Testes de integração — Products
+│   └── UserResourceTest.java       # Testes de integração — Users
 ├── application/service/
 │   └── OrderServiceTest.java       # Testes unitários — OrderService
 └── ExampleResourceTest.java
@@ -647,23 +680,8 @@ src/test/java/br/com/
 | `quarkus-junit5-mockito` | Mocks com `@InjectMock` |
 | `rest-assured` | Testes HTTP fluentes |
 | `quarkus-test-security` | Simula autenticação com `@TestSecurity` |
+| `quarkus-test-vertx` | Contexto Vert.x com `@RunOnVertxContext` |
 | `quarkus-panache-mock` | Mock de repositórios Panache |
-
-### Exemplo de teste com segurança simulada
-
-```java
-@Test
-@TestSecurity(user = "admin", roles = {"ROLE_ADMIN"})
-void testDelete() {
-    Mockito.when(customerService.delete("cust-001"))
-            .thenReturn(Uni.createFrom().voidItem());
-
-    given()
-        .when().delete("/api/v1/customers/cust-001")
-        .then()
-        .statusCode(204);
-}
-```
 
 ---
 
@@ -686,8 +704,8 @@ void testDelete() {
 # Subir tudo
 docker compose up --build
 
-# Subir em background
-docker compose up -d --build
+# Subir apenas infraestrutura (dev local)
+docker compose up postgres postgres-keycloak keycloak vault vault-init -d
 
 # Ver logs da aplicação
 docker compose logs -f app
@@ -697,23 +715,6 @@ docker compose down
 
 # Reset completo (remove volumes)
 docker compose down -v
-
-# Rebuild apenas da aplicação
-docker compose up --build app
-```
-
-### Dockerfile — Multi-stage build
-
-```
-Stage 1 (builder): eclipse-temurin:21-jdk-alpine
-  └── ./gradlew build -x test --no-daemon -Dquarkus.package.jar.type=fast-jar
-
-Stage 2 (runtime): eclipse-temurin:21-jre-alpine
-  ├── Usuário não-root (appuser:appgroup)
-  ├── 4 camadas separadas (lib/, app/, quarkus/, *.jar)
-  ├── CSVs do dataset copiados para ./data/
-  ├── JVM tunada para containers (G1GC, MaxRAMPercentage=75%)
-  └── HEALTHCHECK no /api/v1/health
 ```
 
 ---
@@ -722,40 +723,29 @@ Stage 2 (runtime): eclipse-temurin:21-jre-alpine
 
 ### Arquitetura
 - **DDD** com separação clara de `domain`, `application`, `infrastructure` e `interfaces`
-- **Dependency Inversion** — camadas superiores dependem de interfaces, não de implementações
+- **Dependency Inversion** — camadas superiores dependem de interfaces
 - **Records** Java 21 para DTOs imutáveis
 - **Programação reativa** end-to-end com Mutiny (`Uni<T>`)
+- `@WithSession` em leituras e `@WithTransaction` em escritas (Hibernate Reactive)
 
 ### Segurança
-- Tokens JWT validados pelo Keycloak (chaves públicas JWKS)
-- Segredos nunca em código-fonte — gerenciados pelo Vault
+- Tokens JWT validados pelo Keycloak (JWKS)
+- OIDC com `discovery-enabled=false` — sem dependência de conexão no boot
+- Segredos gerenciados pelo Vault em produção
 - Usuário não-root no container Docker
-- CORS configurado explicitamente
-- Rate Limiting por IP para proteção contra abuso
+- Rate Limiting por IP
 
 ### Banco de Dados
-- Migrations versionadas com Liquibase (nunca `drop-and-create`)
-- Hibernate ORM e Reactive com `schema-management.action: none` — Liquibase é a única fonte de verdade do schema
+- Migrations versionadas com Liquibase
+- Sequences explícitas para Hibernate Reactive Panache
 - Índices criados para colunas de busca frequente
-- Repositórios com interface no domínio e implementação na infraestrutura
 
 ### API
 - **HATEOAS Nível 3** — respostas com links de hipermídia
 - Paginação em todos os endpoints de listagem
-- Validação de entrada com Bean Validation (`@NotBlank`, `@Size`) via `quarkus-hibernate-validator`
-- Códigos HTTP semânticos (201 Created, 204 No Content, 404, 422, 429)
-- Exception Mapper global para respostas de erro padronizadas
-
-### Observabilidade
-- Health check endpoint (`/api/v1/health`) — público, sem autenticação
-- Logs estruturados por pacote (`br.com` em DEBUG)
-- Headers de Rate Limit em todas as respostas
-
-### Build e Deploy
-- Multi-stage Dockerfile (imagem final ~200MB)
-- `depends_on` com `condition` no Compose para ordem de inicialização correta
-- Variáveis de ambiente para override de configuração em produção
-- `.env.example` documentado e seguro para commitar
+- Validação de entrada com Bean Validation
+- Códigos HTTP semânticos (201, 204, 400, 401, 403, 404, 422, 429)
+- Exception Mapper global para respostas padronizadas
 
 ---
 
